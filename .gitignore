@@ -1,0 +1,12 @@
+build/
+dist/
+*pyc
+*.bak
+*#*
+TAGS
+*.egg-info
+*~
+*.swp
+.DS*
+.virtualenv
+.coverage*
