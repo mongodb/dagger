@@ -7,6 +7,7 @@ import libgiza.error
 import dagger.config.cli
 import dagger.operations.hello_world
 import dagger.operations.version
+import dagger.operations.viz
 
 logger = logging.getLogger("dagger.cli")
 
@@ -14,6 +15,7 @@ commands = {
     "main": [
         dagger.operations.hello_world.main,
         dagger.operations.version.main,
+        dagger.operations.viz.main,
         ],
 }
 

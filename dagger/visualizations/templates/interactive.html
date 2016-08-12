@@ -1,0 +1,324 @@
+<html>
+  <head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" type="text/css" href="static/interactive.css">
+    <script src="static/d3.v3.min.js"></script>
+    <script src="static/jquery-3.1.0.min.js"></script>
+    <script>
+
+      document.addEventListener("DOMContentLoaded", function(event) {
+
+        var width = 1800;
+        var height = 900;
+        var nodeSet = {};
+        var linkSet = {};
+        var numNodes = 0;
+        var numLinks = 0;
+        var nodes;
+        var links;
+
+        var LIB_STR = "Library";
+        var FIL_STR = "File";
+        var SYM_STR = "Symbol";
+
+        var PATHS = {
+          explDeps: "/expldeps/",
+          implDeps: "/impldeps/",
+          fileToLibDeps: "/filetolibdeps/",
+          fileDeps: "/fildeps/",
+          symDeps: "/symdeps/",
+          defdSyms: "/defdsyms/",
+          defdFiles: "/defdfiles/",
+          fileInfo: "/fileinfo/",
+          libInfo: "/libinfo/",
+          symLeaks: "/symleaks/"
+        };
+
+        var color = d3.scale.category20();
+
+        var force = d3.layout.force()
+            .linkDistance(120)
+            .charge(-300)
+            .gravity(0.05)
+            .size([width, height])
+            .on("tick", tick);
+
+        var svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        svg = svg.call(d3.behavior.zoom().on("zoom", function () {
+              svg.attr("transform", "translate(" + d3.event.translate + ")" + " scale(" + d3.event.scale + ")");
+            }))
+            .append("g");
+
+        var allLinks = svg.selectAll(".link");
+        var allNodes = svg.selectAll(".node");
+
+        // add listener to input for any change
+        document.getElementsByName("search")[0].addEventListener('input', function(e) {
+          findPattern(this.value);
+          update();
+        });
+
+        document.getElementsByName("query")[0].addEventListener("keyup", function(e) {
+          e.preventDefault();
+          if (e.keyCode === 13) {
+            executeQuery(this.value);
+            // clear focus so we can do fancy keypresses when clicking nodes
+            document.activeElement.blur();
+          }
+        });
+
+        function executeQuery(query) {
+          initializeVisualization('/query/' + query);
+        }
+
+        function initializeVisualization(query) {
+          if (query !== undefined) {
+            d3.json(query, function(error, graph) {
+              if (error) {
+                throw error;
+              }
+
+              nodes = graph.nodes;
+              links = graph.links; 
+              nodeSet = {};
+              linkSet = {};
+
+              // populate sets with initial data
+              nodes.forEach(function(node) {
+                nodeSet[node.name] = node;
+              });
+              links.forEach(function(link) {
+                linkSet[link.linkId] = link;
+              });
+
+              numNodes = nodes.length;
+              numLinks = links.length;
+
+              update();
+            });
+          }
+        }
+        
+        function tick() {
+          allLinks.attr("x1", function(d) { return d.source.x; })
+              .attr("y1", function(d) { return d.source.y; })
+              .attr("x2", function(d) { return d.target.x; })
+              .attr("y2", function(d) { return d.target.y; });
+
+          allNodes.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+        }
+
+        function abstractAdd(d, path) {
+          var subGraph = httpGet(path + d.name);
+
+          subGraph.nodes.forEach(function(node) {
+            if (!(nodeSet[node.name])) {
+              nodes.push(node);
+              nodeSet[node.name] = node;
+              numNodes++;
+            }
+          });
+
+          subGraph.links.forEach(function(link) {
+            if (!(linkSet[link.linkId])) {
+              links.push(link);
+              linkSet[link.linkId] = link;
+              numLinks++;
+            }
+          });
+        }
+
+        function httpGet(path) {
+          var xmlHttp = new XMLHttpRequest();
+          xmlHttp.open("GET", path, false);
+          xmlHttp.send(null);
+
+          if (xmlHttp.status !== 200) {
+            console.log("Non 200 Response on Request:", path);
+            return {"nodes": [], "links": []};
+          }
+
+          return JSON.parse(xmlHttp.responseText);
+        }
+
+        function getInfo(node, prepath) {
+          var fullPath = prepath + node.name;
+          return httpGet(fullPath);
+        }
+
+        function findPattern(pattern) {
+          if (pattern.length === 0) {
+             nodes.forEach(function(node) { 
+              node.highlighted = false;
+            });
+          } else {
+            nodes.forEach(function(node) { 
+              node.highlighted = node.name.includes(pattern);
+            });
+          }
+        }
+
+        function update() {
+          var nodesByType;
+          var nodeEnter;
+
+          var highlightedStrokeWidth = 12;
+          var defaultStrokeWidth = 1;
+
+          // Restart the force layout.
+          force.nodes(nodes)
+            .links(links)
+            .start();
+
+          allLinks = allLinks.data(links, function(d) { return d.linkId; });
+          allLinks.exit().remove();
+
+          allNodes = allNodes.data(nodes, function(d) { return d.id; });
+          allNodes.exit().remove();
+
+          allLinks.enter().insert("line", ".node")
+              .attr("marker-end", function(d) { return "url(#" + d.type + ")"; })
+              .attr("class", "link");
+
+          // Define the arrowheads for our edges
+          // Name different types for different styles.
+          svg.append("defs").selectAll("marker")
+            .data(["LibraryToLibrary", "LibraryToFile", "FileToLibrary", "FileToFile", "LibraryToSymbol", "FileToSymbol", "ImplicitLibraryToLibrary"])
+            .enter().append("marker")
+              .attr("id", function(d) { return d; })
+              .attr("viewBox", "0 -5 10 10")
+              .attr("refX", 15)
+              .attr("markerWidth", 15)
+              .attr("markerHeight", 85)
+              .attr("orient", "auto")
+            .append("path")
+              .attr("d", "M0,-5L10,0L0,5");
+
+          // assign package names
+          nodes.forEach(function(d) {
+            d.connectors = [];
+            d.packageName = d.name.split("/")[1];
+          });
+
+          // create dict by node type
+          nodesByType = d3.nest()
+            .key(function(d) { return d.type; })
+            .sortKeys(d3.ascending)
+            .entries(nodes);
+
+          nodeEnter = allNodes.enter().append("g")
+            .attr("class", "node")
+            .on("click", clickNode)
+            .on("mouseover", hoverNode);
+
+          function hoverNode(d) {
+            document.getElementById("nodeName").innerHTML = d.name;
+          }
+
+          function bringUpSidebar(d) {
+            var symLeaks;
+            var libInfo;
+            var fileInfo;
+            var definedSyms;
+            var definedFiles;
+
+            function createInfoSnippet(title, nodes) {
+              var html = "<br> <b>" + title + "</b>";
+
+              nodes.forEach(function (node) {
+                html += "<br>" + node.name;
+              });
+
+              return html;
+            }
+            
+            if (d.type === LIB_STR) {
+              symLeaks = getInfo(d, PATHS.symLeaks);
+              definedFiles = getInfo(d, PATHS.defdFiles); 
+            }
+
+            if (d.type === SYM_STR || d.type === FIL_STR) {
+              libInfo = getInfo(d, PATHS.libInfo);
+            }
+
+            if (d.type === SYM_STR) {
+              fileInfo = getInfo(d, PATHS.fileInfo);
+            }
+
+            if (d.type === LIB_STR || d.type === FIL_STR) {
+              definedSyms = getInfo(d, PATHS.defdSyms);
+            }
+
+            document.getElementById("sidebar").innerHTML = d.name;
+
+            if (d.type === LIB_STR) {
+              document.getElementById("sidebar").innerHTML += createInfoSnippet("Symbol Leaks", symLeaks.nodes);
+              document.getElementById("sidebar").innerHTML += createInfoSnippet("Defined Files", definedFiles.nodes);
+            } else if (d.type === FIL_STR) {
+              document.getElementById("sidebar").innerHTML += createInfoSnippet("Library Info", libInfo.nodes);
+            } else {
+              document.getElementById("sidebar").innerHTML += createInfoSnippet("File Info", fileInfo.nodes);
+              document.getElementById("sidebar").innerHTML += createInfoSnippet("Library Info", libInfo.nodes);
+            } 
+          }
+
+          function clickNode(d) {
+            // prevent drag
+            if (d3.event.defaultPrevented) return;
+
+            if (d3.event.shiftKey) {
+              if (d.type === LIB_STR) {
+                abstractAdd(d, PATHS.explDeps);
+              } else if (d.type === FIL_STR) {
+                abstractAdd(d, PATHS.fileToLibDeps);
+              }
+            } else if (d3.event.altKey) {
+              if (d.type === LIB_STR) {
+                abstractAdd(d, PATHS.implDeps);
+              }
+            } else if (d3.event.ctrlKey) {
+              abstractAdd(d, PATHS.fileDeps);
+            } else {
+              bringUpSidebar(d);
+            }
+            
+            update();
+          }
+
+          // make nodes into different symbols
+          nodeEnter.append("path")
+              .attr("d", d3.svg.symbol()
+                .size(function(d) { return 500; })
+                .type(function(d) { 
+                    if (d.type === LIB_STR) { return "circle"; }
+                    if (d.type === FIL_STR) { return "square"; }
+                    return "cross";
+                }));
+
+          // thicken strokewidth if node matches a current search
+          d3.selectAll(".node path").style("stroke-width", function(d) {
+            return d.highlighted ? highlightedStrokeWidth : defaultStrokeWidth;
+          });
+
+          allNodes.select("path")
+              .style("fill", function(d) { return color(d.group);});
+        }
+
+        initializeVisualization();
+      });
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div id="sidebar">
+      </div>
+      <div id="content">
+        <input type="text" name="search" placeholder="search">
+        <input type="text" name="query" placeholder="query" size="80">
+        <div id="nodeName"></div>
+      </div>
+  </body>
+</html>
