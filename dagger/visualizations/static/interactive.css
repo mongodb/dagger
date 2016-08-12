@@ -1,0 +1,93 @@
+.node path {
+  cursor: pointer;
+  stroke: #000;
+  stroke-width: 1px;
+}
+
+.node text {
+  font: 10px sans-serif;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+line {
+  fill: none;
+  stroke: #9ecae1;
+  stroke-width: 1.5px;
+}
+
+.link {
+  fill: none;
+  stroke: #999;
+  stroke-width: 1.5px;
+  opacity: .6;
+}
+
+.container { position:relative; padding:0 0 0 405px; }
+
+#sidebar {
+  position:absolute;
+  top:0; bottom:0; left:0;
+  width:400px;
+  height: 900px;
+  border-right:1px solid #bbb;
+  background:#fafafa;
+  overflow-y: scroll;
+}
+
+#content {
+  margin:5px 0 5px 0;
+}
+
+/* color for edge and arrowhead types */
+#LibraryToLibrary {
+  fill: #9cf;
+}
+
+#LibraryToFile {
+  fill: #f9c;
+}
+
+#FileToFile {
+  fill: #606;
+}
+
+#FileToLibrary {
+  fill: #930;
+}
+
+#LibraryToSymbol {
+  fill: #f60;
+}
+
+#FileToSymbol {
+  fill: #9fc;
+}
+
+#ImplicitLibraryToLibrary {
+  fill: #006;
+}
+
+line.Library_Library {
+  stroke: #9cf;
+}
+
+line.Library_File {
+  stroke: #f9c;
+}
+
+line.File_Symbol {
+  stroke: #9fc;
+}
+
+line.Library_Symbol {
+  stroke: #f60;
+}
+
+line.File_File {
+  stroke: #606;
+}
+
+line.File_Library {
+  stroke: #930;
+}
