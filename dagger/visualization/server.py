@@ -10,7 +10,6 @@ import datetime
 import flask
 
 import dagger.graph
-import dagger.query_engine
 
 app = flask.Flask("Dagger")
 
@@ -21,7 +20,7 @@ def map_node_type_to_str(num):
         return "Symbol"
     elif num == 3:
         return "File"
-    
+
     raise ValueError("Node type should be 1,2, or 3")
 
 def map_edge_type_to_str(num):
