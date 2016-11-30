@@ -1,3 +1,4 @@
+import os
 import sys
 import logging
 
@@ -52,3 +53,32 @@ class DaggerCliConfig(libgiza.config.ConfigurationBase):
 
         root_logger.setLevel(levels[value])
         self.state['level'] = value
+
+    @property
+    def path(self):
+        if 'path' in self.state:
+            return self.state['path']
+        else:
+            raise KeyError("Path is not set")
+
+    @path.setter
+    def path(self, value):
+        if isinstance(value, basestring):
+            if os.path.isfile(value):
+                self.state['path'] = value
+            else:
+                raise ValueError("Path must be a valid file")
+        else:
+            raise TypeError("Path must be a string corresponding to a file name")
+
+
+
+
+
+
+
+
+
+
+
+
