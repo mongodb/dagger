@@ -1,4 +1,3 @@
-import os
 import json
 
 import dagger
@@ -6,6 +5,7 @@ import dagger
 import argh
 import libgiza
 import yaml
+import flask
 
 
 def print_version(key, versions, prefix=""):
@@ -23,6 +23,7 @@ def main(args):
             "libgiza": libgiza.__version__,
             "yaml": yaml.__version__,
             "argh": argh.__version__,
+            "flask": flask.__version__,
         },
     }
 
