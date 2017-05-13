@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" type="text/css" href="static/force.css">
+  <script src="//d3js.org/d3.v3.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.1.0.min.js"></script>
+  <script>
+
+    (function() {
+      document.addEventListener("DOMContentLoaded", staticLayout);
+
+      function staticLayout() {
+
+        var toggle = document.getElementById('toggleInfoPanelButton');
+        var enlargeLibCB = document.getElementById('enlargeLibCheckbox');
+        var enlargePropCB = document.getElementById('enlargePropCheckbox');
+
+        var width = screen.availWidth;
+        var height = screen.availHeight;
+
+        var defaultNodeSize = 6;
+        var forceIterations = 100;
+
+        var force;
+
+        var svg;
+        var loading;
+
+        function toggleInfoPanel() {
+          document.getElementById('info-panel').classList.toggle('hidden');
+        }
+
+        // Enlarge all library nodes equally
+        // TODO this doesn't work with current data format, need to copy enlargeprop style
+        function enlargeLibs(checkBox) {
+          var newSize = defaultNodeSize;
+          if (checkBox.checked && d.type === LIB_STR) {
+            newSize *= 2;
+          }
+
+          svg.selectAll("circle").attr("r", newSize);
+        }
+
+        // Enlarge library nodes proportional to the number of lib-to-lib dependencies they have
+        function enlargeProportionally(checkBox) {
+          svg.selectAll("circle").attr("r", nodeRadius);
+
+          function nodeRadius(d) {
+            if (checkBox.checked) {
+              // we're checking for static libs that have file extension ".a"
+              if (d.name.slice(-2) === ".a") {
+                return defaultNodeSize * 2 + d.children.length;
+              }
+              
+              return defaultNodeSize;
+            } 
+            
+            return defaultNodeSize;
+          }
+        }
+
+        function draw() {
+          var color = d3.scale.category20();
+
+          // Display via text the lib-to-lib dependencies of a node when hovering over it
+          function hoverNode(d) {
+
+            function prettifyChildren(d) {
+              var text = d.name;
+              d.children.forEach(function(child) {
+                text += "<br>";
+                text += child;
+              });
+              
+              return text;
+            }
+
+            document.getElementById("currentNodeLabel").innerHTML = prettifyChildren(d);
+          }
+
+          function drawPath(d) {
+            var deltaX = d.target.x - d.source.x;
+            var deltaY = d.target.y - d.source.y;
+            var dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            var normX = deltaX / dist;
+            var normY = deltaY / dist;
+            var sourcePadding = d.left ? 17 : 12;
+            var targetPadding = d.right ? 17 : 12;
+            var sourceX = d.source.x + (sourcePadding * normX);
+            var sourceY = d.source.y + (sourcePadding * normY);
+            var targetX = d.target.x - (targetPadding * normX);
+            var targetY = d.target.y - (targetPadding * normY);
+            return 'M' + sourceX + ',' + sourceY + 'L' + targetX + ',' + targetY;
+          }
+
+          // Define the arrowheads for our edges
+          // Name different types for different styles.
+          svg.append("defs").selectAll("marker")
+            .data(["lib_to_lib", "lib_to_file", "fil_to_fil", "lib_to_sym", "fil_to_sym"])
+            .enter().append("marker")
+              .attr("id", function(d) { return d; })
+              .attr("viewBox", "0 -5 10 10")
+              .attr("refX", 5)
+              .attr("markerWidth", 8)
+              .attr("markerHeight", 85)
+              .attr("orient", "auto")
+              .append("path")
+              .attr("d", "M0,-5L10,0L0,5");
+
+          // Create the edges between nodes.
+          svg.append("g").selectAll("path")
+            .data(force.links())
+            .enter().append("path")
+              .attr("class", function(d) { return "link " + d.type; })
+              .attr("marker-end", function(d) { return "url(#" + d.type + ")"; })
+              .attr('d', drawPath); 
+
+          // Create the circles/nodes 
+          svg.append("g").selectAll("circle")
+            .data(force.nodes())
+            .enter().append("circle")
+              .attr("r", defaultNodeSize) 
+              .on("mouseover", hoverNode)
+              .attr("class", "node")
+              .attr("id", function(d) { return d.id; })
+              .attr("cx", function(d) { return d.x; })
+              .attr("cy", function(d) { return d.y; })
+              .style("fill", function(d) { return color(d.group);});
+        }
+
+        $(toggle).on('click', toggleInfoPanel);
+        $(enlargeLibCB).on('click', enlargeLibs);
+        $(enlargePropCB).on('click', enlargeProportionally)
+
+        // Create the force simulator
+        force = d3.layout.force()
+            .charge(-300)
+            .linkDistance(60)
+            .size([width, height]);
+
+        // Create the SVG we will be drawing on
+        svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        svg = svg.call(d3.behavior.zoom().on("zoom", function () {
+              svg.attr("transform", "translate(" + d3.event.translate + ")" + " scale(" + d3.event.scale + ")");
+            }))
+          .append("g");
+
+        // Create a loading text since we will be rendering a static graph after some time
+        loading = svg.append("text")
+            .attr("x", width / 2)
+            .attr("y", height / 2)
+            .attr("dy", ".35em")
+            .style("position", "fixed")
+            .style("font-size", "1em")
+            .text("Simulating. Give me about 5 seconds" + String.fromCharCode(8230));
+
+        // graph should be a dict with two keys: nodes and links
+        // nodes -> list of node objects
+        // links -> list of link objects
+        // node is { "group": num, "children": ["str"], "id": num, "name": "str" }
+        // link is { "source": source_id, "target": target_id, "type": "str", "value": 1 }
+        d3.json("/forcedata", function(error, graph) {
+          if (error) throw error;
+
+          // Populate force simulation with our data.
+          force.nodes(graph.nodes).links(graph.links);
+
+          // Run simulation through number of timesteps without actually displaying
+          force.start();
+          for (var i=0; i<forceIterations; i++) {
+            force.tick();
+          }
+          force.stop();
+          loading.remove();
+
+          draw();
+        });
+      }
+
+    })();
+    
+  </script>
+</head>
+<body>
+  <div class="info-panel-wrapper">
+    <button id="toggleInfoPanelButton" type="button">Toggle Panel</button>
+    <a href="/hive">Hive Plot</a>
+    <div id="info-panel">
+      <div id="options-panel">
+        <input id="enlargeLibCheckbox" type="checkbox" name="enlarge">Enlarge Library Nodes</input>
+        <br>
+        <input id="enlargePropCheckbox" type="checkbox">Enlarge Proportionally</input>
+        <br>
+      </div>
+      <div id="currentNodeLabel"></div>
+    </div>
+  </div>
+</body>
+</html>

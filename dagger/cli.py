@@ -15,7 +15,7 @@ commands = {
     "main": [
         dagger.operations.version.main,
         dagger.operations.repl.main,
-        dagger.operations.viz.main
+        dagger.operations.viz.main,
         ],
 }
 
