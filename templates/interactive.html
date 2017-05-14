@@ -82,7 +82,7 @@
               }
 
               nodes = graph.nodes;
-              links = graph.links; 
+              links = graph.links;
               nodeSet = {};
               linkSet = {};
 
@@ -101,7 +101,7 @@
             });
           }
         }
-        
+
         function tick() {
           allLinks.attr("x1", function(d) { return d.source.x; })
               .attr("y1", function(d) { return d.source.y; })
@@ -151,11 +151,11 @@
 
         function findPattern(pattern) {
           if (pattern.length === 0) {
-             nodes.forEach(function(node) { 
+             nodes.forEach(function(node) {
               node.highlighted = false;
             });
           } else {
-            nodes.forEach(function(node) { 
+            nodes.forEach(function(node) {
               node.highlighted = node.name.includes(pattern);
             });
           }
@@ -200,7 +200,7 @@
           // assign package names
           nodes.forEach(function(d) {
             d.connectors = [];
-            d.packageName = d.name.split("/")[1];
+            d.packageName = d.name;
           });
 
           // create dict by node type
@@ -234,10 +234,10 @@
 
               return html;
             }
-            
+
             if (d.type === LIB_STR) {
               symLeaks = getInfo(d, PATHS.symLeaks);
-              definedFiles = getInfo(d, PATHS.defdFiles); 
+              definedFiles = getInfo(d, PATHS.defdFiles);
             }
 
             if (d.type === SYM_STR || d.type === FIL_STR) {
@@ -262,7 +262,7 @@
             } else {
               document.getElementById("sidebar").innerHTML += createInfoSnippet("File Info", fileInfo.nodes);
               document.getElementById("sidebar").innerHTML += createInfoSnippet("Library Info", libInfo.nodes);
-            } 
+            }
           }
 
           function clickNode(d) {
@@ -284,7 +284,7 @@
             } else {
               bringUpSidebar(d);
             }
-            
+
             update();
           }
 
@@ -292,7 +292,7 @@
           nodeEnter.append("path")
               .attr("d", d3.svg.symbol()
                 .size(function(d) { return 500; })
-                .type(function(d) { 
+                .type(function(d) {
                     if (d.type === LIB_STR) { return "circle"; }
                     if (d.type === FIL_STR) { return "square"; }
                     return "cross";

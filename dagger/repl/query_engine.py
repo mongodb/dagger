@@ -226,7 +226,7 @@ def get_symbol_deps(g, id):
     elif node.type == dagger.graph_consts.NODE_FILE:
         edge_type = dagger.graph_consts.FIL_SYM
     else:
-        raise TypeError()
+        raise TypeError("node type '{0}', with id of '{0}'".format(node.type, id))
 
     return gen_outgoing_subgraph(g, id, edge_type)
 

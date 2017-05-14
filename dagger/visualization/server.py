@@ -14,7 +14,7 @@ import dagger.repl.query_engine as query_engine
 
 app = flask.Flask("Dagger")
 
-logger = logging.getLogger("dagger.vizualization.server")
+logger = logging.getLogger("dagger.visualization.server")
 
 
 def map_node_type_to_str(num):
@@ -24,8 +24,10 @@ def map_node_type_to_str(num):
         return "Symbol"
     elif num == 3:
         return "File"
+    elif num == 4:
+        return "Artifact"
 
-    raise ValueError("Node type should be 1,2, or 3")
+    raise ValueError("Node type should be 1,2, or 3 (is {0})".format(num))
 
 
 def map_edge_type_to_str(num):
@@ -161,7 +163,7 @@ def single_node_to_d3(node):
 
 def set_of_nodes_to_d3(node_set):
     new_nodes = []
-    data = {"nodes":new_nodes, "links":[]}
+    data = {"nodes": new_nodes, "links":[]}
 
     if node_set is None:
         logger.info("set of nodes was empty")
@@ -200,6 +202,11 @@ def set_of_nodes_to_d3_for_sidebar(node_set):
 # ---- pages ----
 @app.route('/')
 def force_plot():
+    flask.session.permanent = True
+    flask.session['groups'] = {}
+    flask.session['nodes'] = collections.OrderedDict()
+    flask.session['links'] = collections.OrderedDict()
+
     return flask.render_template("force.html")
 
 
@@ -215,29 +222,31 @@ def interactive_plot():
 
 @app.route('/hive')
 def hive_plot():
+    flask.session.permanent = True
+    flask.session['groups'] = {}
+    flask.session['nodes'] = collections.OrderedDict()
+    flask.session['links'] = collections.OrderedDict()
+
     return flask.render_template("hive.html")
 
 
 # ---- static data ----
 @app.route('/forcedata')
 def force_data():
-    with open("force_graph.json", "r") as f:
-        j = f.read()
-        return j
+    return graph_obj_to_d3(None)
 
 
 @app.route('/hivedata')
 def hive_data():
-    with open("hive.json", "r") as f:
-        j = f.read()
-        return j
+    return graph_obj_to_d3(dep_graph)
 
 
 # ---- interactive queries ----
 @app.route('/query/<path:myquery>')
 def query(myquery):
     """Queries should all be of format function_name node"""
-    func, node = myquery.split("/", 1)
+    logger.debug("got query: {0}, which splits to: {1}".format(myquery, myquery.split()))
+    func, node = myquery.split()
     logger.info("doing '{0}' query for '{1}'".format(func, node))
 
     # reset nodes and links for queries
@@ -254,10 +263,10 @@ def query(myquery):
         sub_graph = query_engine.get_implicit_lib_deps(dep_graph, node)
         return graph_obj_to_d3(sub_graph)
     elif func == "get_fil_deps":
-        sub_graph = query_engine.get_fil_deps(dep_graph, node)
+        sub_graph = query_engine.get_file_deps(dep_graph, node)
         return graph_obj_to_d3(sub_graph)
     elif func == "get_sym_deps":
-        sub_graph = query_engine.get_sym_deps(dep_graph, node)
+        sub_graph = query_engine.get_symbol_deps(dep_graph, node)
         return graph_obj_to_d3(sub_graph)
     elif func == "get_dep_libs":
         sub_graph = query_engine.get_dependent_libs(dep_graph, node)
@@ -333,10 +342,10 @@ def find_symbol_leaks(node):
     return set_of_nodes_to_d3_for_sidebar(query_engine.find_symbol_leaks(dep_graph, node))
 
 
-def main():
+def start_app(graph_file="library_dependency_graph.json"):
     app.permanent_session_lifetime = datetime.timedelta(minutes=100)
     global dep_graph
-    dep_graph = dagger.graph.Graph("library_dependency_graph.json")
+    dep_graph = dagger.graph.Graph(graph_file)
     app.secret_key = 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT'
     app.use_reloader = False
     app.debug = False
