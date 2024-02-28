@@ -1,26 +1,24 @@
-import threading
 import logging
+from argh import named, arg, expects_obj
+import webbrowser
 
-import argh
+import dagger.visualization.server as viz_server
 
-import dagger.visualization.server
-
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dagger.operations.viz")
 
-
-@argh.named("viz")
-@argh.arg("path", help="path to file", default="libdeps.json")
-@argh.expects_obj
+@named("viz")
+@arg("path", help="Path to the file", default="libdeps.json")
+@expects_obj
 def main(args):
-    logger.info("starting server now... (initialization takes several seconds)")
-    logger.info("open: http://127.0.0.1:5000/interactive")
-    dagger.visualization.server.start_app(args.path)
-
-    # t = threading.Thread(
-    #     target=,
-    #     args=[args.path])
-    # t.daemon = True
-    # t.start()
-
-    # # webbrowser.open(url)
-    # raw_input("Enter anything to kill server\n")
+    
+    server_url = "http://127.0.0.1:5000/interactive"
+    
+    logger.info("Starting server now... (initialization takes several seconds)")
+    logger.info(f"Open: {server_url}")
+    
+    viz_server.start_app(args.path)
+    
+    webbrowser.open(server_url)
+    
+    input("Press Enter to exit...\n")
